@@ -303,11 +303,12 @@ omp_extract_for_data (gomp_for *for_stmt, struct omp_for_data *fd,
     gcc_assert (fd->chunk_size == NULL);
   else if (fd->chunk_size == NULL)
     {
+      /* hierarchical_extension - default chunk size */
       /* We only need to compute a default chunk size for ordered
 	 static loops and dynamic loops.  */
       if (fd->sched_kind != OMP_CLAUSE_SCHEDULE_STATIC
 	  || fd->have_ordered)
-	fd->chunk_size = (fd->sched_kind == OMP_CLAUSE_SCHEDULE_STATIC)
+	fd->chunk_size = ((fd->sched_kind == OMP_CLAUSE_SCHEDULE_STATIC) || (fd->sched_kind == OMP_CLAUSE_SCHEDULE_HIERARCHICAL))
 			 ? integer_zero_node : integer_one_node;
     }
 

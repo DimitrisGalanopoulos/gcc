@@ -2884,6 +2884,10 @@ create_parallel_loop (class loop *loop, tree loop_fn, tree data,
 	case PARLOOPS_SCHEDULE_GUIDED:
 	  OMP_CLAUSE_SCHEDULE_KIND (t) = OMP_CLAUSE_SCHEDULE_GUIDED;
 	  break;
+	/* hierarchical_extension */
+	case PARLOOPS_SCHEDULE_HIERARCHICAL:
+	  OMP_CLAUSE_SCHEDULE_KIND (t) = OMP_CLAUSE_SCHEDULE_HIERARCHICAL;
+	  break;
 	case PARLOOPS_SCHEDULE_AUTO:
 	  OMP_CLAUSE_SCHEDULE_KIND (t) = OMP_CLAUSE_SCHEDULE_AUTO;
 	  chunk_size = 0;

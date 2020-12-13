@@ -371,12 +371,14 @@ enum cf_protection_level
   CF_SET = 1 << 2
 };
 
+/* hierarchical_extension */
 /* Parloops schedule type.  */
 enum parloops_schedule_type
 {
   PARLOOPS_SCHEDULE_STATIC = 0,
   PARLOOPS_SCHEDULE_DYNAMIC,
   PARLOOPS_SCHEDULE_GUIDED,
+  PARLOOPS_SCHEDULE_HIERARCHICAL,
   PARLOOPS_SCHEDULE_AUTO,
   PARLOOPS_SCHEDULE_RUNTIME
 };

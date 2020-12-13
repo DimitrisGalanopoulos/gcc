@@ -30,6 +30,11 @@
 #include <stdlib.h>
 
 
+/* hierarchical_extension */
+#undef HIER_ULL
+#include "hierarchical_schedule/iter_hierarchical.h"
+
+
 /* This function implements the STATIC scheduling method.  The caller should
    iterate *pstart <= x < *pend.  Return zero if there are more iterations
    to perform; nonzero if not.  Return less than 0 if this thread had
@@ -335,4 +340,42 @@ gomp_iter_guided_next (long *pstart, long *pend)
   *pend = nend;
   return true;
 }
+
+
+/* hierarchical_extension */
+bool
+gomp_iter_hierarchical_next (long *pstart, long *pend)
+{
+	PRINT_DEBUG("IN pstart=%ld pend=%ld", *pstart, *pend);
+	struct gomp_thread *thr = gomp_thread ();
+	struct gomp_work_share *ws = thr->ts.work_share;
+	struct gomp_team *team = thr->ts.team;
+	unsigned long nthreads = team ? team->nthreads : 1;
+	long start, end, chunk, incr;
+
+	start = ws->next;
+	end = ws->end;
+	incr = ws->incr;
+	chunk = ws->chunk_size;
+
+	if ((thr->ts.level > 1) || (nthreads == 1))    // We don't support nested parallelism.
+	{
+		if (thr->ts.team_id == 0)   // team master
+		{
+			*pstart = start;
+			*pend = end;
+			ws->next = end;
+			PRINT_DEBUG("OUT");
+			return start != end;
+		}
+		else
+		{
+			PRINT_DEBUG("OUT");
+			return false;
+		}
+	}
+
+	return gomp_iter_l_ull_hierarchical_next(chunk, start, end, incr, pstart, pend);
+}
+
 #endif /* HAVE_SYNC_BUILTINS */

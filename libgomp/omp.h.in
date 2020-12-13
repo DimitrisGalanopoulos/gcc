@@ -50,7 +50,9 @@ typedef enum omp_sched_t
   omp_sched_static = 1,
   omp_sched_dynamic = 2,
   omp_sched_guided = 3,
-  omp_sched_auto = 4,
+  /* hierarchical_extension */
+  omp_sched_hierarchical = 4,
+  omp_sched_auto = 5,
   omp_sched_monotonic = 0x80000000U
 } omp_sched_t;
 
@@ -110,6 +112,24 @@ extern int omp_get_dynamic (void) __GOMP_NOTHROW;
 
 extern void omp_set_nested (int) __GOMP_NOTHROW;
 extern int omp_get_nested (void) __GOMP_NOTHROW;
+
+
+/* hierarchical_extension */
+extern int  omp_get_cpu_node_size()  __GOMP_NOTHROW;
+extern int  omp_get_max_thread_group_size()  __GOMP_NOTHROW;
+extern int  omp_get_thread_group_size()  __GOMP_NOTHROW;
+extern int  omp_get_num_thread_groups()  __GOMP_NOTHROW;
+extern int  omp_get_thread_group_num()  __GOMP_NOTHROW;
+extern int  omp_get_thread_group_pos()  __GOMP_NOTHROW;
+extern int  omp_get_thread_group_master_num()  __GOMP_NOTHROW;
+extern int  omp_get_hierarchical_stealing() __GOMP_NOTHROW;
+extern void omp_set_hierarchical_stealing(int v) __GOMP_NOTHROW;
+extern int  omp_get_hierarchical_static() __GOMP_NOTHROW;
+extern void omp_set_hierarchical_static(int v) __GOMP_NOTHROW;
+extern int  omp_get_gws_owner_thread_group_num()  __GOMP_NOTHROW;
+extern void omp_set_loop_partitioner(void fun(long start, long end, long * part_start, long * part_end)) __GOMP_NOTHROW;
+extern void omp_set_after_stealing_fun(void group_fun(int owner_group, long start, long end), void thread_fun(int owner_group, long start, long end)) __GOMP_NOTHROW;
+
 
 extern void omp_init_lock (omp_lock_t *) __GOMP_NOTHROW;
 extern void omp_init_lock_with_hint (omp_lock_t *, omp_sync_hint_t)

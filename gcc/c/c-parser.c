@@ -14727,7 +14727,7 @@ c_parser_omp_clause_reduction (c_parser *parser, enum omp_clause_code kind,
    schedule ( schedule-kind , expression )
 
    schedule-kind:
-     static | dynamic | guided | runtime | auto
+     static | dynamic | guided | hierarchical | runtime | auto
 
    OpenMP 4.5:
    schedule ( schedule-modifier : schedule-kind )
@@ -14801,6 +14801,13 @@ c_parser_omp_clause_schedule (c_parser *parser, tree list)
 	  if (strcmp ("guided", p) != 0)
 	    goto invalid_kind;
 	  OMP_CLAUSE_SCHEDULE_KIND (c) = OMP_CLAUSE_SCHEDULE_GUIDED;
+	  break;
+
+	/* hierarchical_extension */
+	case 'h':
+	  if (strcmp ("hierarchical", p) != 0)
+	    goto invalid_kind;
+	  OMP_CLAUSE_SCHEDULE_KIND (c) = OMP_CLAUSE_SCHEDULE_HIERARCHICAL;
 	  break;
 
 	case 'r':

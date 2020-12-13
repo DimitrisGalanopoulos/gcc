@@ -710,9 +710,13 @@ Chunk size of omp schedule for loops parallelized by parloops.
 Common Joined UInteger Var(param_parloops_min_per_thread) Init(100) IntegerRange(2, 65536) Param Optimization
 Minimum number of iterations per thread of an innermost parallelized loop.
 
+; hierarchical_extension
+; Option files are a simple list of records in which each field occupies its own line and in which the records themselves are separated by blank lines.
+; Comments may appear on their own line anywhere within the file and are preceded by semicolons. Whitespace is allowed before the semicolon.
+
 -param=parloops-schedule=
 Common Joined Var(param_parloops_schedule) Enum(parloops_schedule_type) Param Optimization
---param=parloops-schedule=[static|dynamic|guided|auto|runtime]	Schedule type of omp schedule for loops parallelized by parloops.
+--param=parloops-schedule=[static|dynamic|guided|hierarchical|auto|runtime]	Schedule type of omp schedule for loops parallelized by parloops.
 
 Enum
 Name(parloops_schedule_type) Type(int)
@@ -725,6 +729,9 @@ Enum(parloops_schedule_type) String(dynamic) Value(PARLOOPS_SCHEDULE_DYNAMIC)
 
 EnumValue
 Enum(parloops_schedule_type) String(guided) Value(PARLOOPS_SCHEDULE_GUIDED)
+
+EnumValue
+Enum(parloops_schedule_type) String(hierarchical) Value(PARLOOPS_SCHEDULE_HIERARCHICAL)
 
 EnumValue
 Enum(parloops_schedule_type) String(auto) Value(PARLOOPS_SCHEDULE_AUTO)

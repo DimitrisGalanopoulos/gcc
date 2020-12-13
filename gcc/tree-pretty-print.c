@@ -631,6 +631,10 @@ dump_omp_clause (pretty_printer *pp, tree clause, int spc, dump_flags_t flags)
 	case OMP_CLAUSE_SCHEDULE_GUIDED:
 	  pp_string (pp, "guided");
 	  break;
+	/* hierarchical_extension */
+	case OMP_CLAUSE_SCHEDULE_HIERARCHICAL:
+	  pp_string (pp, "hierarchical");
+	  break;
 	case OMP_CLAUSE_SCHEDULE_RUNTIME:
 	  pp_string (pp, "runtime");
 	  break;

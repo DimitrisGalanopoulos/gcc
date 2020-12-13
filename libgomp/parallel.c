@@ -326,6 +326,131 @@ omp_get_active_level (void)
   return gomp_thread ()->ts.active_level;
 }
 
+//==========================================================================================================================================
+// hierarchical_extension
+//==========================================================================================================================================
+
+
+int
+omp_get_cpu_node_size()
+{
+	return gomp_cpu_node_size;
+}
+
+
+int
+omp_get_max_thread_group_size()
+{
+	return gomp_max_thread_group_size;
+}
+
+
+int
+omp_get_thread_group_size()
+{
+	return gomp_thread()->t_data->group_data->group_size; 
+}
+
+
+int
+omp_get_num_thread_groups()
+{
+	return gomp_num_thread_groups;
+}
+
+
+int
+omp_get_thread_group_num()
+{
+	return gomp_thread()->t_data->tgnum;
+}
+
+
+int
+omp_get_thread_group_pos()
+{
+	return gomp_thread()->t_data->tgpos;
+}
+
+
+int
+omp_get_thread_group_master_num()
+{
+	return gomp_thread()->t_data->group_data->master_tnum;
+}
+
+
+int
+omp_get_hierarchical_stealing()
+{
+	return gomp_hierarchical_stealing;
+}
+
+
+void
+omp_set_hierarchical_stealing(int v)
+{
+	gomp_hierarchical_stealing = v;
+}
+
+
+int
+omp_get_hierarchical_static()
+{
+	return gomp_hierarchical_static;
+}
+
+
+void
+omp_set_hierarchical_static(int v)
+{
+	gomp_hierarchical_static = v;
+}
+
+
+int
+omp_get_gws_owner_thread_group_num()
+{
+	return gomp_thread()->t_data->gws->owner_group;
+}
+
+
+void
+omp_set_loop_partitioner(void fun(long start, long end, long * part_start, long * part_end))
+{
+	if (gomp_thread()->ts.team_id == 0)   // team master (single thread)
+	{
+		gomp_use_custom_loop_partitioner = 1;
+		gomp_loop_partitioner = fun;
+	}
+	// We are expecting a barrier before entering the hierarchical loop.
+}
+
+
+void
+omp_set_after_stealing_fun(void group_fun(int owner_group, long start, long end), void thread_fun(int owner_group, long start, long end))
+{
+	if (gomp_thread()->ts.team_id == 0)   // team master
+	{
+		// We buffer these first and actually set them inside the loop, after the barrier.
+
+		// Function executed by each group master.
+		if (group_fun != NULL)
+		{
+			gomp_use_after_stealing_group_fun_next_loop = 1;
+			gomp_after_stealing_group_fun_next_loop = group_fun;
+		}
+
+		// Function executed by each thread.
+		if (thread_fun != NULL)
+		{
+			gomp_use_after_stealing_thread_fun_next_loop = 1;
+			gomp_after_stealing_thread_fun_next_loop = thread_fun;
+		}
+	}
+}
+
+
 ialias (omp_get_num_threads)
 ialias (omp_get_thread_num)
 ialias (omp_in_parallel)

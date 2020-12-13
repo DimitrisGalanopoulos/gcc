@@ -98,6 +98,7 @@ gomp_thread_start (void *xdata)
   /* Make thread pool local. */
   pool = thr->thread_pool;
 
+  PRINT_DEBUG("IN");
   if (data->nested)
     {
       struct gomp_team *team = thr->ts.team;
@@ -114,7 +115,21 @@ gomp_thread_start (void *xdata)
     {
       pool->threads[thr->ts.team_id] = thr;
 
+      /* hierarchical_extension */
+      {
+	      struct gomp_thread_group_data ** groups = __atomic_load_n(&pool->groups, __ATOMIC_RELAXED);
+	      int max_threads = pool->threads_used;
+	      struct gomp_thread_data * t_data = gomp_malloc(sizeof(*t_data));
+	      thr->t_data = t_data;
+	      gomp_thread_data_init(t_data, groups, thr->ts.team_id, max_threads, gomp_max_thread_group_size);
+
+	      gomp_simple_barrier_wait (&pool->threads_dock);
+
+	      gomp_set_thread_group_data(t_data, groups);
+      }
+
       gomp_simple_barrier_wait (&pool->threads_dock);
+
       do
 	{
 	  struct gomp_team *team = thr->ts.team;
@@ -137,6 +152,7 @@ gomp_thread_start (void *xdata)
   pthread_detach (pthread_self ());
   thr->thread_pool = NULL;
   thr->task = NULL;
+  PRINT_DEBUG("OUT");
   return NULL;
 }
 #endif
@@ -144,6 +160,7 @@ gomp_thread_start (void *xdata)
 static inline struct gomp_team *
 get_last_team (unsigned nthreads)
 {
+  PRINT_DEBUG("IN");
   struct gomp_thread *thr = gomp_thread ();
   if (thr->ts.team == NULL)
     {
@@ -152,9 +169,11 @@ get_last_team (unsigned nthreads)
       if (last_team != NULL && last_team->nthreads == nthreads)
         {
           pool->last_team = NULL;
+	  PRINT_DEBUG("OUT");
           return last_team;
         }
     }
+  PRINT_DEBUG("OUT");
   return NULL;
 }
 
@@ -163,6 +182,7 @@ get_last_team (unsigned nthreads)
 struct gomp_team *
 gomp_new_team (unsigned nthreads)
 {
+  PRINT_DEBUG("IN");
   struct gomp_team *team;
   int i;
 
@@ -206,6 +226,7 @@ gomp_new_team (unsigned nthreads)
   team->work_share_cancelled = 0;
   team->team_cancelled = 0;
 
+  PRINT_DEBUG("OUT");
   return team;
 }
 
@@ -215,6 +236,7 @@ gomp_new_team (unsigned nthreads)
 static void
 free_team (struct gomp_team *team)
 {
+  PRINT_DEBUG("IN");
 #ifndef HAVE_SYNC_BUILTINS
   gomp_mutex_destroy (&team->work_share_list_free_lock);
 #endif
@@ -222,11 +244,13 @@ free_team (struct gomp_team *team)
   gomp_mutex_destroy (&team->task_lock);
   priority_queue_free (&team->task_queue);
   team_free (team);
+  PRINT_DEBUG("OUT");
 }
 
 static void
 gomp_free_pool_helper (void *thread_pool)
 {
+  PRINT_DEBUG("IN");
   struct gomp_thread *thr = gomp_thread ();
   struct gomp_thread_pool *pool
     = (struct gomp_thread_pool *) thread_pool;
@@ -245,6 +269,7 @@ gomp_free_pool_helper (void *thread_pool)
 #else
 #error gomp_free_pool_helper must terminate the thread
 #endif
+  PRINT_DEBUG("OUT");
 }
 
 /* Free a thread pool and release its threads. */
@@ -252,6 +277,7 @@ gomp_free_pool_helper (void *thread_pool)
 void
 gomp_free_thread (void *arg __attribute__((unused)))
 {
+  PRINT_DEBUG("IN");
   struct gomp_thread *thr = gomp_thread ();
   struct gomp_thread_pool *pool = thr->thread_pool;
   if (pool)
@@ -298,6 +324,7 @@ gomp_free_thread (void *arg __attribute__((unused)))
       gomp_end_task ();
       free (task);
     }
+  PRINT_DEBUG("OUT");
 }
 
 /* Launch a team.  */
@@ -308,6 +335,7 @@ gomp_team_start (void (*fn) (void *), void *data, unsigned nthreads,
 		 unsigned flags, struct gomp_team *team,
 		 struct gomp_taskgroup *taskgroup)
 {
+  PRINT_DEBUG("IN");
   struct gomp_thread_start_data *start_data;
   struct gomp_thread *thr, *nthr;
   struct gomp_task *task;
@@ -373,7 +401,10 @@ gomp_team_start (void (*fn) (void *), void *data, unsigned nthreads,
   team->implicit_task[0].icv.bind_var = bind_var;
 
   if (nthreads == 1)
+   {
+    PRINT_DEBUG("OUT");
     return;
+   }
 
   i = 1;
 
@@ -850,7 +881,23 @@ gomp_team_start (void (*fn) (void *), void *data, unsigned nthreads,
   if (nested)
     gomp_barrier_wait (&team->barrier);
   else
-    gomp_simple_barrier_wait (&pool->threads_dock);
+  {
+	  /* hierarchical_extension */
+	  struct gomp_thread_data * t_data = thr->t_data;
+	  if (__builtin_expect(t_data == NULL, 0))
+	  {
+		  int max_threads = pool->threads_used;
+		  t_data = gomp_malloc(sizeof(*t_data));
+		  thr->t_data = t_data;
+		  gomp_thread_data_init(t_data, pool->groups, thr->ts.team_id, max_threads, gomp_max_thread_group_size);
+
+		  gomp_simple_barrier_wait (&pool->threads_dock);
+
+		  gomp_set_thread_group_data(t_data, pool->groups);
+	  }
+
+	  gomp_simple_barrier_wait (&pool->threads_dock);
+  }
 
   /* Decrease the barrier threshold to match the number of threads
      that should arrive back at the end of this team.  The extra
@@ -917,6 +964,7 @@ gomp_team_start (void (*fn) (void *), void *data, unsigned nthreads,
   if (__builtin_expect (affinity_thr != NULL, 0)
       && team->prev_ts.place_partition_len > 64)
     free (affinity_thr);
+  PRINT_DEBUG("OUT");
 }
 #endif
 
@@ -927,6 +975,7 @@ gomp_team_start (void (*fn) (void *), void *data, unsigned nthreads,
 void
 gomp_team_end (void)
 {
+  PRINT_DEBUG("IN");
   struct gomp_thread *thr = gomp_thread ();
   struct gomp_team *team = thr->ts.team;
 
@@ -992,6 +1041,7 @@ gomp_team_end (void)
       pool->last_team = team;
       gomp_release_thread_pool (pool);
     }
+  PRINT_DEBUG("OUT");
 }
 
 #ifdef LIBGOMP_USE_PTHREADS
@@ -1001,6 +1051,7 @@ gomp_team_end (void)
 static void __attribute__((constructor))
 initialize_team (void)
 {
+  PRINT_DEBUG("IN");
 #if !defined HAVE_TLS && !defined USE_EMUTLS
   static struct gomp_thread initial_thread_tls_data;
 
@@ -1010,14 +1061,17 @@ initialize_team (void)
 
   if (pthread_key_create (&gomp_thread_destructor, gomp_free_thread) != 0)
     gomp_fatal ("could not create thread pool destructor.");
+  PRINT_DEBUG("OUT");
 }
 
 static void __attribute__((destructor))
 team_destructor (void)
 {
+  PRINT_DEBUG("IN");
   /* Without this dlclose on libgomp could lead to subsequent
      crashes.  */
   pthread_key_delete (gomp_thread_destructor);
+  PRINT_DEBUG("OUT");
 }
 
 /* Similar to gomp_free_pool_helper, but don't detach itself,
@@ -1026,6 +1080,7 @@ team_destructor (void)
 static void
 gomp_pause_pool_helper (void *thread_pool)
 {
+  PRINT_DEBUG("IN");
   struct gomp_thread *thr = gomp_thread ();
   struct gomp_thread_pool *pool
     = (struct gomp_thread_pool *) thread_pool;
@@ -1033,6 +1088,7 @@ gomp_pause_pool_helper (void *thread_pool)
   gomp_sem_destroy (&thr->release);
   thr->thread_pool = NULL;
   thr->task = NULL;
+  PRINT_DEBUG("OUT");
   pthread_exit (NULL);
 }
 
@@ -1042,10 +1098,14 @@ gomp_pause_pool_helper (void *thread_pool)
 int
 gomp_pause_host (void)
 {
+  PRINT_DEBUG("IN");
   struct gomp_thread *thr = gomp_thread ();
   struct gomp_thread_pool *pool = thr->thread_pool;
   if (thr->ts.level)
+   {
+    PRINT_DEBUG("OUT");
     return -1;
+   }
   if (pool)
     {
       if (pool->threads_used > 0)
@@ -1087,6 +1147,7 @@ gomp_pause_host (void)
 #endif
       thr->thread_pool = NULL;
     }
+  PRINT_DEBUG("OUT");
   return 0;
 }
 #endif
@@ -1094,6 +1155,7 @@ gomp_pause_host (void)
 struct gomp_task_icv *
 gomp_new_icv (void)
 {
+  PRINT_DEBUG("IN");
   struct gomp_thread *thr = gomp_thread ();
   struct gomp_task *task = gomp_malloc (sizeof (struct gomp_task));
   gomp_init_task (task, NULL, &gomp_global_icv);
@@ -1101,5 +1163,6 @@ gomp_new_icv (void)
 #ifdef LIBGOMP_USE_PTHREADS
   pthread_setspecific (gomp_thread_destructor, thr);
 #endif
+  PRINT_DEBUG("OUT");
   return &task->icv;
 }

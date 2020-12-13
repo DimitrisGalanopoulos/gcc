@@ -10,6 +10,21 @@ OMP_1.0 {
 	omp_get_dynamic;
 	omp_set_nested;
 	omp_get_nested;
+        # hierarchical_extension
+	omp_get_cpu_node_size;
+	omp_get_max_thread_group_size;
+	omp_get_thread_group_size;
+	omp_get_num_thread_groups;
+	omp_get_thread_group_num;
+	omp_get_thread_group_pos;
+	omp_get_thread_group_master_num;
+	omp_get_hierarchical_stealing;
+	omp_set_hierarchical_stealing;
+	omp_get_hierarchical_static;
+	omp_set_hierarchical_static;
+	omp_get_gws_owner_thread_group_num;
+	omp_set_loop_partitioner;
+	omp_set_after_stealing_fun;
 #ifdef HAVE_SYMVER_SYMBOL_RENAMING_RUNTIME_SUPPORT
         # If the assembler used lacks the .symver directive or the linker
 	# doesn't support GNU symbol versioning, we have the same symbol in
@@ -195,6 +210,9 @@ GOMP_1.0 {
 	GOMP_loop_end_nowait;
 	GOMP_loop_guided_next;
 	GOMP_loop_guided_start;
+        # hierarchical_extension
+	GOMP_loop_hierarchical_next;
+	GOMP_loop_hierarchical_start;
 	GOMP_loop_ordered_dynamic_next;
 	GOMP_loop_ordered_dynamic_start;
 	GOMP_loop_ordered_guided_next;
@@ -212,6 +230,8 @@ GOMP_1.0 {
 	GOMP_parallel_end;
 	GOMP_parallel_loop_dynamic_start;
 	GOMP_parallel_loop_guided_start;
+        # hierarchical_extension
+	GOMP_parallel_loop_hierarchical_start;
 	GOMP_parallel_loop_runtime_start;
 	GOMP_parallel_loop_static_start;
 	GOMP_parallel_sections_start;
@@ -233,6 +253,9 @@ GOMP_2.0 {
 	GOMP_loop_ull_dynamic_start;
 	GOMP_loop_ull_guided_next;
 	GOMP_loop_ull_guided_start;
+        # hierarchical_extension
+	GOMP_loop_ull_hierarchical_next;
+	GOMP_loop_ull_hierarchical_start;
 	GOMP_loop_ull_ordered_dynamic_next;
 	GOMP_loop_ull_ordered_dynamic_start;
 	GOMP_loop_ull_ordered_guided_next;
@@ -260,6 +283,8 @@ GOMP_4.0 {
 	GOMP_loop_end_cancel;
 	GOMP_parallel_loop_dynamic;
 	GOMP_parallel_loop_guided;
+        # hierarchical_extension
+	GOMP_parallel_loop_hierarchical;
 	GOMP_parallel_loop_runtime;
 	GOMP_parallel_loop_static;
 	GOMP_parallel_sections;

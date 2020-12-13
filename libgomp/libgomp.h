@@ -213,6 +213,8 @@ enum gomp_schedule_type
   GFS_STATIC,
   GFS_DYNAMIC,
   GFS_GUIDED,
+  /* hierarchical_extension */
+  GFS_HIERARCHICAL,
   GFS_AUTO,
   GFS_MONOTONIC = 0x80000000U
 };
@@ -453,6 +455,32 @@ extern size_t gomp_affinity_format_len;
 extern int goacc_device_num;
 extern char *goacc_device_type;
 extern int goacc_default_dims[GOMP_DIM_MAX];
+
+
+/* hierarchical_extension */
+
+extern int gomp_cpu_node_size;
+extern int gomp_max_thread_group_size;
+extern int gomp_num_thread_groups;
+
+extern int gomp_hierarchical_stealing;
+extern int gomp_hierarchical_static;
+extern int gomp_hierarchical_stealing_cpu_node_locality_pass;
+extern int gomp_hierarchical_stealing_scores;
+
+extern int gomp_use_custom_loop_partitioner;
+extern void (* gomp_loop_partitioner) (long start, long end, long * part_start, long * part_end);
+
+extern int gomp_use_after_stealing_group_fun_next_loop;
+extern void (* gomp_after_stealing_group_fun_next_loop) (int owner_group, long start, long end);
+extern int gomp_use_after_stealing_group_fun;
+extern void (* gomp_after_stealing_group_fun) (int owner_group, long start, long end);
+
+extern int gomp_use_after_stealing_thread_fun_next_loop;
+extern void (* gomp_after_stealing_thread_fun_next_loop) (int owner_group, long start, long end);
+extern int gomp_use_after_stealing_thread_fun;
+extern void (* gomp_after_stealing_thread_fun) (int owner_group, long start, long end);
+
 
 enum gomp_task_kind
 {
@@ -702,6 +730,9 @@ struct gomp_thread
   /* User pthread thread pool */
   struct gomp_thread_pool *thread_pool;
 
+  /* hierarchical_extension */
+  struct gomp_thread_data * t_data;
+
 #if defined(LIBGOMP_USE_PTHREADS) \
     && (!defined(HAVE_TLS) \
 	|| !defined(__GLIBC__) \
@@ -724,6 +755,10 @@ struct gomp_thread_pool
   struct gomp_thread **threads;
   unsigned threads_size;
   unsigned threads_used;
+
+  /* hierarchical_extension */
+  struct gomp_thread_group_data ** groups;
+
   /* The last team is used for non-nested teams to delay their destruction to
      make sure all the threads in the team move on to the pool's barrier before
      the team's barrier is destroyed.  */
@@ -857,6 +892,8 @@ extern bool gomp_iter_guided_next_locked (long *, long *);
 #ifdef HAVE_SYNC_BUILTINS
 extern bool gomp_iter_dynamic_next (long *, long *);
 extern bool gomp_iter_guided_next (long *, long *);
+/* hierarchical_extension */
+extern bool gomp_iter_hierarchical_next (long *, long *);
 #endif
 
 /* iter_ull.c */
@@ -873,6 +910,8 @@ extern bool gomp_iter_ull_dynamic_next (unsigned long long *,
 					unsigned long long *);
 extern bool gomp_iter_ull_guided_next (unsigned long long *,
 				       unsigned long long *);
+/* hierarchical_extension */
+extern bool gomp_iter_ull_hierarchical_next (unsigned long long *, unsigned long long *);
 #endif
 
 /* ordered.c */
@@ -1366,5 +1405,10 @@ gomp_thread_to_pthread_t (struct gomp_thread *thr)
   return gomp_thread_self ();
 }
 #endif
+
+
+/* hierarchical_extension */
+#include "hierarchical_schedule/hier_sched_structs.h"
+
 
 #endif /* LIBGOMP_H */

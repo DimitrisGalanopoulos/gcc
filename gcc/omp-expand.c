@@ -590,6 +590,7 @@ expand_parallel_call (struct omp_region *region, basic_block bb,
 
   clauses = gimple_omp_parallel_clauses (entry_stmt);
 
+  /* hierarchical_extension - change start_ix2 values (if >= 3 add 1) due to addition of hierarchical in omp-builtins.def */
   /* Determine what flavor of GOMP_parallel we will be
      emitting.  */
   start_ix = BUILT_IN_GOMP_PARALLEL;
@@ -608,15 +609,15 @@ expand_parallel_call (struct omp_region *region, basic_block bb,
 	      /* For lastprivate(conditional:), our implementation
 		 requires monotonic behavior.  */
 	      if (region->inner->has_lastprivate_conditional != 0)
-		start_ix2 = 3;
+		start_ix2 = 4;
 	      else if ((region->inner->sched_modifiers
 		       & OMP_CLAUSE_SCHEDULE_NONMONOTONIC) != 0)
-		start_ix2 = 6;
+		start_ix2 = 7;
 	      else if ((region->inner->sched_modifiers
 			& OMP_CLAUSE_SCHEDULE_MONOTONIC) == 0)
-		start_ix2 = 7;
+		start_ix2 = 8;
 	      else
-		start_ix2 = 3;
+		start_ix2 = 4;
 	      break;
 	    case OMP_CLAUSE_SCHEDULE_DYNAMIC:
 	    case OMP_CLAUSE_SCHEDULE_GUIDED:
@@ -624,7 +625,7 @@ expand_parallel_call (struct omp_region *region, basic_block bb,
 		   & OMP_CLAUSE_SCHEDULE_MONOTONIC) == 0
 		  && !region->inner->has_lastprivate_conditional)
 		{
-		  start_ix2 = 3 + region->inner->sched_kind;
+		  start_ix2 = 4 + region->inner->sched_kind;
 		  break;
 		}
 	      /* FALLTHRU */
@@ -6555,6 +6556,11 @@ expand_omp_for (struct omp_region *region, gimple *inner_stmt)
     }
   else
     {
+      /* hierarchical_extension - change values of
+       *     fn_index -> due to omp-builtins.def: if >= 3 add 1
+       * TODO:
+       *     what is 'sched' for?
+       */
       int fn_index, start_ix, next_ix;
       unsigned HOST_WIDE_INT sched = 0;
       tree sched_arg = NULL_TREE;
@@ -6562,7 +6568,7 @@ expand_omp_for (struct omp_region *region, gimple *inner_stmt)
       gcc_assert (gimple_omp_for_kind (fd.for_stmt)
 		  == GF_OMP_FOR_KIND_FOR);
       if (fd.chunk_size == NULL
-	  && fd.sched_kind == OMP_CLAUSE_SCHEDULE_STATIC)
+	  && (fd.sched_kind == OMP_CLAUSE_SCHEDULE_STATIC || fd.sched_kind == OMP_CLAUSE_SCHEDULE_HIERARCHICAL))
 	fd.chunk_size = integer_zero_node;
       switch (fd.sched_kind)
 	{
@@ -6571,16 +6577,16 @@ expand_omp_for (struct omp_region *region, gimple *inner_stmt)
 	      && fd.lastprivate_conditional == 0)
 	    {
 	      gcc_assert (!fd.have_ordered);
-	      fn_index = 6;
+	      fn_index = 7;
 	      sched = 4;
 	    }
 	  else if ((fd.sched_modifiers & OMP_CLAUSE_SCHEDULE_MONOTONIC) == 0
 		   && !fd.have_ordered
 		   && fd.lastprivate_conditional == 0)
-	    fn_index = 7;
+	    fn_index = 8;
 	  else
 	    {
-	      fn_index = 3;
+	      fn_index = 4;
 	      sched = (HOST_WIDE_INT_1U << 31);
 	    }
 	  break;
@@ -6590,13 +6596,17 @@ expand_omp_for (struct omp_region *region, gimple *inner_stmt)
 	      && !fd.have_ordered
 	      && fd.lastprivate_conditional == 0)
 	    {
-	      fn_index = 3 + fd.sched_kind;
+	      fn_index = 4 + fd.sched_kind;
 	      sched = (fd.sched_kind == OMP_CLAUSE_SCHEDULE_GUIDED) + 2;
 	      break;
 	    }
 	  fn_index = fd.sched_kind;
 	  sched = (fd.sched_kind == OMP_CLAUSE_SCHEDULE_GUIDED) + 2;
 	  sched += (HOST_WIDE_INT_1U << 31);
+	  break;
+	case OMP_CLAUSE_SCHEDULE_HIERARCHICAL:
+	  fn_index = fd.sched_kind;
+	  sched += (HOST_WIDE_INT_1U << 31) + 2;
 	  break;
 	case OMP_CLAUSE_SCHEDULE_STATIC:
 	  gcc_assert (fd.have_ordered);

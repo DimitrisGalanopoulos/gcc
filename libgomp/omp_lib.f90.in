@@ -34,7 +34,9 @@
         integer (omp_sched_kind), parameter :: omp_sched_static = 1
         integer (omp_sched_kind), parameter :: omp_sched_dynamic = 2
         integer (omp_sched_kind), parameter :: omp_sched_guided = 3
-        integer (omp_sched_kind), parameter :: omp_sched_auto = 4
+        ! hierarchical_extension 
+        integer (omp_sched_kind), parameter :: omp_sched_hierarchical = 4
+        integer (omp_sched_kind), parameter :: omp_sched_auto = 5
         integer (omp_proc_bind_kind), &
                  parameter :: omp_proc_bind_false = 0
         integer (omp_proc_bind_kind), &

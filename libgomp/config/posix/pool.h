@@ -36,6 +36,7 @@
 static inline struct gomp_thread_pool *
 gomp_get_thread_pool (struct gomp_thread *thr, unsigned nthreads)
 {
+  PRINT_DEBUG("IN");
   struct gomp_thread_pool *pool = thr->thread_pool;
   if (__builtin_expect (pool == NULL, 0))
     {
@@ -47,7 +48,13 @@ gomp_get_thread_pool (struct gomp_thread *thr, unsigned nthreads)
       pool->threads_busy = nthreads;
       thr->thread_pool = pool;
       pthread_setspecific (gomp_thread_destructor, thr);
+
+      /* hierarchical_extension */
+      int num_groups = (nthreads + gomp_max_thread_group_size - 1) / gomp_max_thread_group_size;
+      struct tpool_thread_group_data ** groups = gomp_malloc(num_groups * sizeof(*pool->groups));
+      __atomic_store_n(&pool->groups, groups, __ATOMIC_RELAXED);
     }
+  PRINT_DEBUG("OUT");
   return pool;
 }
 

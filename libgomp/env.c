@@ -95,6 +95,47 @@ char *goacc_device_type;
 int goacc_device_num;
 int goacc_default_dims[GOMP_DIM_MAX];
 
+
+/* hierarchical_extension */
+
+int gomp_cpu_node_size;
+int gomp_max_thread_group_size;
+int gomp_num_thread_groups;
+
+/*
+ * Persistent settings (only set/restored manually by the user).
+ */
+
+int gomp_hierarchical_stealing = 1;
+int gomp_hierarchical_static = 0;
+int gomp_hierarchical_stealing_cpu_node_locality_pass;
+int gomp_hierarchical_stealing_scores;
+
+/*
+ * Volatile settings (restored automatically by the library).
+ */
+
+int gomp_use_custom_loop_partitioner = 0;   // We can't assign NULL to a function pointer, so we need a flag.
+void (* gomp_loop_partitioner) (long start, long end, long * part_start, long * part_end);
+
+int gomp_use_after_stealing_fun_next_loop = 0;
+int gomp_use_after_stealing_fun           = 0;
+void (* gomp_after_stealing_fun_next_loop) (int owner_group, long start, long end);
+void (* gomp_after_stealing_fun          ) (int owner_group, long start, long end);
+
+// After stealing user functions.
+
+int gomp_use_after_stealing_group_fun_next_loop = 0;
+int gomp_use_after_stealing_group_fun           = 0;
+void (* gomp_after_stealing_group_fun_next_loop) (int owner_group, long start, long end);
+void (* gomp_after_stealing_group_fun          ) (int owner_group, long start, long end);
+
+int gomp_use_after_stealing_thread_fun_next_loop = 0;
+int gomp_use_after_stealing_thread_fun           = 0;
+void (* gomp_after_stealing_thread_fun_next_loop) (int owner_group, long start, long end);
+void (* gomp_after_stealing_thread_fun          ) (int owner_group, long start, long end);
+
+
 #ifndef LIBGOMP_OFFLOADED_ONLY
 
 /* Parse the OMP_SCHEDULE environment variable.  */
@@ -146,6 +187,12 @@ parse_schedule (void)
     {
       gomp_global_icv.run_sched_var = GFS_GUIDED;
       env += 6;
+    }
+  /* hierarchical_extension */
+  else if (strncasecmp (env, "hierarchical", 12) == 0)
+    {
+      gomp_global_icv.run_sched_var = GFS_HIERARCHICAL;
+      env += 12;
     }
   else if (strncasecmp (env, "auto", 4) == 0)
     {
@@ -1208,6 +1255,12 @@ handle_omp_display_env (unsigned long stacksize, int wait_policy)
       if (gomp_global_icv.run_sched_chunk_size != 1)
 	fprintf (stderr, ",%d", gomp_global_icv.run_sched_chunk_size);
       break;
+    /* hierarchical_extension */
+    case GFS_HIERARCHICAL:
+      fputs ("HIERARCHICAL", stderr);
+      if (gomp_global_icv.run_sched_chunk_size != 1)
+	fprintf (stderr, ",%d", gomp_global_icv.run_sched_chunk_size);
+      break;
     case GFS_AUTO:
       fputs ("AUTO", stderr);
       break;
@@ -1328,6 +1381,58 @@ initialize_env (void)
 				 &gomp_nthreads_var_list,
 				 &gomp_nthreads_var_list_len))
     gomp_global_icv.nthreads_var = gomp_available_cpus;
+
+
+	/* hierarchical_extension */
+	if (!parse_int("OMP_CPU_NODE_SIZE", &gomp_cpu_node_size, false))
+	{
+		FILE * fp = fopen("/proc/cpuinfo", "r");
+		char needle[] = "cpu cores";
+		char buf[256];
+		char * saveptr, * token;
+		char ws[] = " \t\n\r";
+
+		gomp_cpu_node_size = 1;
+		if (fp < 0)
+			gomp_error("Couldn't open /proc/cpuinfo");
+		while (fgets(buf, sizeof(buf), fp))
+		{
+			// printf("%s\n", buf);
+			if (!memcmp(buf, needle, sizeof(needle) - 1))      // Minus the '\0'.
+			{
+				token = strtok_r(buf, ws, &saveptr);
+				token = strtok_r(NULL, ws, &saveptr);
+				token = strtok_r(NULL, ws, &saveptr);
+				token = strtok_r(NULL, ws, &saveptr);
+				gomp_cpu_node_size = atoi(token);
+				break;
+			}
+		}
+		if (fclose(fp) < 0)
+			gomp_error("Couldn't close /proc/cpuinfo");
+	}
+
+	if (!parse_int("OMP_MAX_THREAD_GROUP_SIZE", &gomp_max_thread_group_size, false))
+		gomp_max_thread_group_size = 1;
+	gomp_num_thread_groups = (gomp_global_icv.nthreads_var + gomp_max_thread_group_size - 1) / gomp_max_thread_group_size;
+
+	bool flag = true;
+	parse_boolean("OMP_HIERARCHICAL_STEALING", &flag);
+	gomp_hierarchical_stealing = flag ? 1 : 0;
+
+	flag = false;
+	parse_boolean("OMP_HIERARCHICAL_STATIC", &flag);
+	gomp_hierarchical_static = flag ? 1 : 0;
+
+	flag = false;
+	parse_boolean("OMP_HIERARCHICAL_STEALING_CPU_NODE_LOCALITY_PASS", &flag);
+	gomp_hierarchical_stealing_cpu_node_locality_pass = flag ? 1 : 0;
+
+	flag = false;
+	parse_boolean("OMP_HIERARCHICAL_STEALING_SCORES", &flag);
+	gomp_hierarchical_stealing_scores = flag ? 1 : 0;
+
+
   bool ignore = false;
   if (parse_bind_var ("OMP_PROC_BIND",
 		      &gomp_global_icv.bind_var,

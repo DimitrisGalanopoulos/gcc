@@ -78,6 +78,8 @@ omp_set_schedule (omp_sched_t kind, int chunk_size)
       break;
     case omp_sched_dynamic:
     case omp_sched_guided:
+    /* hierarchical_extension */
+    case omp_sched_hierarchical:
       if (chunk_size < 1)
 	chunk_size = 1;
       icv->run_sched_chunk_size = chunk_size;
