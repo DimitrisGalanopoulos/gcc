@@ -100,8 +100,10 @@ struct gomp_thread_group_data {
 	int master_tnum;
 
 	struct gomp_group_work_share * gws_buffer __attribute__ ((aligned (CACHE_LINE_SIZE)));
-	int gws_buffer_size;
-	int gws_current;
+	int gws_buffer_size;   // > 1 to work correctly.
+	int gws_next_index;
+	struct gomp_group_work_share * gws_next;
+	int gws_next_lock;
 
 	char padding[0] __attribute__ ((aligned (CACHE_LINE_SIZE)));
 } __attribute__ ((aligned (CACHE_LINE_SIZE)));
@@ -119,9 +121,11 @@ gomp_thread_group_data_init(struct gomp_thread_group_data * tg_data, int tgnum, 
 	tg_data->num_groups     = num_groups;
 	tg_data->master_tnum    = master_tnum;
 
-	tg_data->gws_buffer_size = 8*group_size;
-	tg_data->gws_current     = -1;
+	tg_data->gws_buffer_size = 8*group_size + 2;    // > 1 to work correctly.
+	tg_data->gws_next_index  = -1;
 	tg_data->gws_buffer      = gomp_malloc(tg_data->gws_buffer_size * sizeof(*tg_data->gws_buffer));
+	__atomic_store_n(&tg_data->gws_next, NULL, __ATOMIC_RELAXED);
+	__atomic_store_n(&tg_data->gws_next_lock, 0, __ATOMIC_SEQ_CST);
 	for (i=0;i<tg_data->gws_buffer_size;i++)
 		gomp_group_work_share_init(&tg_data->gws_buffer[i], max_group_size);
 }
@@ -142,7 +146,6 @@ struct gomp_thread_data {
 	int num_threads;
 	struct gomp_thread_group_data * group_data;
 	struct gomp_group_work_share * gws;
-	struct gomp_group_work_share * gws_next;
 
 	char padding[0] __attribute__ ((aligned (CACHE_LINE_SIZE)));
 } __attribute__ ((aligned (CACHE_LINE_SIZE)));
@@ -161,7 +164,6 @@ gomp_thread_data_init(struct gomp_thread_data * t_data, struct gomp_thread_group
 	t_data->max_group_size = max_group_size;
 	t_data->num_threads    = max_threads;
 	t_data->gws            = NULL;
-	t_data->gws_next       = NULL;
 	if (t_data->tgpos == 0)    // group master
 	{
 		t_data->group_data = gomp_malloc(sizeof(*t_data->group_data));

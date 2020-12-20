@@ -5,9 +5,9 @@
 #include <stdlib.h>
 
 
-// #define PRINT_DEBUG(format, ...)
+#define PRINT_DEBUG(format, ...)
 
-#define PRINT_DEBUG(format, ...)                                                                                                            \
+/* #define PRINT_DEBUG(format, ...)                                                                                                            \
 do {                                                                                                                                        \
 	struct gomp_team_state *ts = &gomp_thread()->ts;                                                                                    \
 	int level = ts->level;                                                                                                              \
@@ -19,7 +19,7 @@ do {                                                                            
 	}                                                                                                                                   \
 	fprintf(stderr, "%ld-%d: %d %s - " format "\n", syscall(SYS_gettid), ts->team_id, level, __FUNCTION__, ##__VA_ARGS__);              \
 	fflush(stderr);                                                                                                                     \
-} while (0)
+} while (0) */
 
 
 #define MIN(a, b)                  \

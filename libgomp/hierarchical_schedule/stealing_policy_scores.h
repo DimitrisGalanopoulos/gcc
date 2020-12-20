@@ -175,7 +175,7 @@ gomp_stealing_policy_pass_valid(int my_tgnum, struct gomp_stealing_passes_data *
 		if (i == my_tgnum)
 			continue;
 		group_data = gomp_thread()->thread_pool->groups[i];
-		j = __atomic_load_n(&group_data->gws_current, __ATOMIC_RELAXED);
+		j = __atomic_load_n(&group_data->gws_next_index, __ATOMIC_RELAXED);
 		if (j < 0)
 			continue;
 		gws = &group_data->gws_buffer[j];
@@ -236,9 +236,8 @@ gomp_stealing_policy_passes(struct gomp_thread_group_data * group_data, struct g
 				continue;
 			s = __atomic_load_n(&gws->START, __ATOMIC_RELAXED);
 			e = __atomic_load_n(&gws->END, __ATOMIC_RELAXED);
-			PRINT_DEBUG("steal_from_group=%d, s=%ld, e=%ld", gws->owner_group, (long) s, (long) e);
 			w = gomp_group_work_share_iter_count(s, e, incr);
-			w_steal = w / 2;
+			w_steal = w / 2;          // Always leaves at least 1 iteration to the victim group, so progress is guaranteed.
 			if (w_steal <= 0)
 			{
 				__atomic_store_n(&gws->steal_lock, 0, __ATOMIC_SEQ_CST);
@@ -246,6 +245,7 @@ gomp_stealing_policy_passes(struct gomp_thread_group_data * group_data, struct g
 			}
 
 			// Test if another thread stole before us.
+			// If true, compare with the amount of work of the next gws in queue.
 			if (gomp_hierarchical_stealing_scores)
 			{
 				if ((w < SPD[i]->work / 2) && ((i >= N-1) || (w < SPD[i+1]->work)))
@@ -274,7 +274,7 @@ gomp_stealing_policy_passes(struct gomp_thread_group_data * group_data, struct g
 			data_holder->END = e;
 			data_holder->owner_group = gws->owner_group;
 			__atomic_store_n(&gws->steal_lock, 0, __ATOMIC_SEQ_CST);
-			PRINT_DEBUG("OUT");
+			PRINT_DEBUG("OUT steal_from_group=%d, s=%ld, e=%ld", gws->owner_group, (long) s, (long) e);
 			return 1;
 		}
 	}
