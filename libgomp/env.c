@@ -102,6 +102,8 @@ int gomp_cpu_node_size;
 int gomp_max_thread_group_size;
 int gomp_num_thread_groups;
 
+struct gomp_barrier_data gomp_group_outer_barrier;
+
 /*
  * Persistent settings (only set/restored manually by the user).
  */
@@ -115,13 +117,9 @@ int gomp_hierarchical_stealing_scores;
  * Volatile settings (restored automatically by the library).
  */
 
-int gomp_use_custom_loop_partitioner = 0;   // We can't assign NULL to a function pointer, so we need a flag.
+// We aren't allowed to assign NULL to a function pointer, so we need a flag.
+int gomp_use_custom_loop_partitioner = 0;
 void (* gomp_loop_partitioner) (long start, long end, long * part_start, long * part_end);
-
-int gomp_use_after_stealing_fun_next_loop = 0;
-int gomp_use_after_stealing_fun           = 0;
-void (* gomp_after_stealing_fun_next_loop) (int owner_group, long start, long end);
-void (* gomp_after_stealing_fun          ) (int owner_group, long start, long end);
 
 // After stealing user functions.
 

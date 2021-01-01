@@ -118,7 +118,9 @@ gomp_thread_start (void *xdata)
       /* hierarchical_extension */
       {
 	      struct gomp_thread_group_data ** groups = __atomic_load_n(&pool->groups, __ATOMIC_RELAXED);
-	      int max_threads = pool->threads_used;
+	      // int max_threads = pool->threads_used;
+	      struct gomp_task_icv * icv = gomp_icv(false);
+	      int max_threads = icv->nthreads_var;
 	      struct gomp_thread_data * t_data = gomp_malloc(sizeof(*t_data));
 	      thr->t_data = t_data;
 	      gomp_thread_data_init(t_data, groups, thr->ts.team_id, max_threads, gomp_max_thread_group_size);

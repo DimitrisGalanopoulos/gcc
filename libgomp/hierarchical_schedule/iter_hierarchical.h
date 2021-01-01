@@ -1,4 +1,5 @@
 #include "hier_sched_structs.h"
+#include "barrier.h"
 
 
 #ifdef HIER_ULL
@@ -19,22 +20,6 @@
 
 
 static inline
-void
-cpu_relax()
-{
-	// __asm("pause");
-	// __asm volatile ("" : : : "memory");
-	// __asm volatile ("pause" : : : "memory");
-	__asm volatile ("rep; pause" : : : "memory");
-	// __asm volatile ("rep; nop" : : : "memory");
-
-	// for (int i=0;i<count;i++)
-		// __asm volatile ("rep; pause" : : : "memory");
-
-}
-
-
-static inline
 INT_T
 gomp_group_work_share_iter_count(INT_T start, INT_T end, INT_T incr)
 {
@@ -45,8 +30,7 @@ gomp_group_work_share_iter_count(INT_T start, INT_T end, INT_T incr)
 }
 
 
-// #include "stealing_policy.h"
-#include "stealing_policy_scores.h"
+#include "stealing_policy.h"
 
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -78,12 +62,13 @@ struct gomp_group_work_share *
 gomp_set_next_gws(struct gomp_thread_group_data * group_data, struct gomp_group_work_share * data_holder)
 {
 	PRINT_DEBUG("IN");
-	struct gomp_group_work_share * gws, * gws_prev;
+	struct gomp_group_work_share * gws;
+	// struct gomp_group_work_share * gws_prev;
 	int group_size = group_data->group_size;
 	int n;
 
 	n = group_data->gws_next_index;
-	gws_prev = &group_data->gws_buffer[n];
+	// gws_prev = &group_data->gws_buffer[n];
 	while (1)
 	{
 		// 'gws_buffer_size' must be > 2 for correctness.
@@ -125,14 +110,6 @@ gomp_set_next_gws(struct gomp_thread_group_data * group_data, struct gomp_group_
 	__atomic_store_n(&gws->END, data_holder->END, __ATOMIC_RELAXED);
 
 	__atomic_store_n(&gws->owner_group, data_holder->owner_group, __ATOMIC_RELAXED);
-
-
-	if (__atomic_load_n(&gomp_use_after_stealing_group_fun, __ATOMIC_RELAXED))
-	{
-		while (__atomic_load_n(&(gws_prev->workers_sem), __ATOMIC_RELAXED) > 0)       // Wait for slaves to exit the previous work share.
-			cpu_relax();
-		gomp_after_stealing_group_fun(data_holder->owner_group, data_holder->START, data_holder->END);
-	}
 
 	// Release gws (unlock).
 	__atomic_store_n(&gws->workers_sem, 0, __ATOMIC_SEQ_CST);
@@ -184,6 +161,7 @@ gomp_steal_gws(struct gomp_thread_data * t_data, struct gomp_thread_group_data *
 	gomp_set_next_gws(group_data, &data_holder);
 
 	__atomic_store_n(&group_data->gws_next_lock, 0, __ATOMIC_SEQ_CST);                                        // Release lock.
+
 	PRINT_DEBUG("OUT 1");
 	return 1;
 }
@@ -196,7 +174,8 @@ gomp_enter_gws(struct gomp_group_work_share * gws)
 	PRINT_DEBUG("IN");
 	if ((gws == NULL)
 		|| (__atomic_load_n(&gws->status, __ATOMIC_RELAXED) == GWS_CLAIMED)
-		|| (__atomic_fetch_add(&gws->workers_sem, 1, __ATOMIC_RELAXED) < 0))
+		|| (__atomic_load_n(&gws->workers_sem, __ATOMIC_RELAXED) < 0)
+		|| (__atomic_fetch_add(&gws->workers_sem, 1, __ATOMIC_SEQ_CST) < 0))
 	{
 		PRINT_DEBUG("OUT -1");
 		return -1;
@@ -277,7 +256,7 @@ gomp_get_next_gws(struct gomp_thread_data * t_data, struct gomp_thread_group_dat
 
 static inline
 void
-gomp_initialize_group_work(int num_workers, int worker_pos, INT_T start, INT_T end, INT_T * local_start, INT_T * local_end)
+gomp_initialize_work(int num_workers, int worker_pos, INT_T start, INT_T end, INT_T * local_start, INT_T * local_end)
 {
 	INT_T len         = end - start;
 	INT_T per_t_len   = len / num_workers;
@@ -297,6 +276,30 @@ gomp_initialize_group_work(int num_workers, int worker_pos, INT_T start, INT_T e
 
 
 static inline
+void
+gomp_initialize_user_functions()
+{
+	if (__atomic_load_n(&gomp_use_after_stealing_group_fun_next_loop, __ATOMIC_RELAXED))
+	{
+		__atomic_store_n(&gomp_use_after_stealing_group_fun, 1, __ATOMIC_RELAXED);
+		__atomic_store_n(&gomp_use_after_stealing_group_fun_next_loop, 0, __ATOMIC_RELAXED);
+		__atomic_store_n(&gomp_after_stealing_group_fun, gomp_after_stealing_group_fun_next_loop, __ATOMIC_RELAXED);
+	}
+	else
+		__atomic_store_n(&gomp_use_after_stealing_group_fun, 0, __ATOMIC_RELAXED);
+
+	if (__atomic_load_n(&gomp_use_after_stealing_thread_fun_next_loop, __ATOMIC_RELAXED))
+	{
+		__atomic_store_n(&gomp_use_after_stealing_thread_fun, 1, __ATOMIC_RELAXED);
+		__atomic_store_n(&gomp_use_after_stealing_thread_fun_next_loop, 0, __ATOMIC_RELAXED);
+		__atomic_store_n(&gomp_after_stealing_thread_fun, gomp_after_stealing_thread_fun_next_loop, __ATOMIC_RELAXED);
+	}
+	else
+		__atomic_store_n(&gomp_use_after_stealing_thread_fun, 0, __ATOMIC_RELAXED);
+}
+
+
+static inline
 bool
 gomp_iter_l_ull_hierarchical_next(INT_T grain_size_init, INT_T start, INT_T end, INT_T incr, INT_T * pstart, INT_T * pend)
 {
@@ -305,7 +308,6 @@ gomp_iter_l_ull_hierarchical_next(INT_T grain_size_init, INT_T start, INT_T end,
 	PRINT_DEBUG("IN");
 
 	struct gomp_thread             * thr        = gomp_thread();
-	struct gomp_thread_pool        * pool       = thr->thread_pool;
 	struct gomp_thread_data        * t_data     = thr->t_data;
 	struct gomp_thread_group_data  * group_data = t_data->group_data;
 	struct gomp_group_work_share   * gws        = t_data->gws;
@@ -316,9 +318,7 @@ gomp_iter_l_ull_hierarchical_next(INT_T grain_size_init, INT_T start, INT_T end,
 
 	if (__builtin_expect(gws == NULL, 0))    // First time in loop.
 	{
-		gomp_simple_barrier_wait(&pool->threads_dock);
-
-		if (t_data->tgpos == 0)     // group master
+		if (barrier_wait(group_data->inner_barrier))
 		{
 			struct gomp_group_work_share data_holder;
 			// User loop partitioner.
@@ -330,59 +330,28 @@ gomp_iter_l_ull_hierarchical_next(INT_T grain_size_init, INT_T start, INT_T end,
 				data_holder.END = tmp_end;
 			}
 			else
-				gomp_initialize_group_work(group_data->num_groups, t_data->tgnum, start, end, &data_holder.START, &data_holder.END);
+				gomp_initialize_work(group_data->num_groups, t_data->tgnum, start, end, &data_holder.START, &data_holder.END);
 			data_holder.owner_group = t_data->tgnum;
 			gws = gomp_set_next_gws(group_data, &data_holder);
-			// t_data->gws = gws;
 
-			gomp_simple_barrier_wait(&pool->threads_dock);
-
-			// After-stealing user functions.
-			// Initialized after the first 'gomp_set_next_gws()', which would call the group function.
-			if (thr->ts.team_id == 0)   // team master
+			if (barrier_wait(&gomp_group_outer_barrier))
 			{
-				if (__atomic_load_n(&gomp_use_after_stealing_group_fun_next_loop, __ATOMIC_RELAXED))
-				{
-					__atomic_store_n(&gomp_use_after_stealing_group_fun, 1, __ATOMIC_RELAXED);
-					__atomic_store_n(&gomp_use_after_stealing_group_fun_next_loop, 0, __ATOMIC_RELAXED);
-					__atomic_store_n(&gomp_after_stealing_group_fun, gomp_after_stealing_group_fun_next_loop, __ATOMIC_RELAXED);
-				}
-				else
-					__atomic_store_n(&gomp_use_after_stealing_group_fun, 0, __ATOMIC_RELAXED);
-
-				if (__atomic_load_n(&gomp_use_after_stealing_thread_fun_next_loop, __ATOMIC_RELAXED))
-				{
-					__atomic_store_n(&gomp_use_after_stealing_thread_fun, 1, __ATOMIC_RELAXED);
-					__atomic_store_n(&gomp_use_after_stealing_thread_fun_next_loop, 0, __ATOMIC_RELAXED);
-					__atomic_store_n(&gomp_after_stealing_thread_fun, gomp_after_stealing_thread_fun_next_loop, __ATOMIC_RELAXED);
-				}
-				else
-					__atomic_store_n(&gomp_use_after_stealing_thread_fun, 0, __ATOMIC_RELAXED);
-			}
-
-			// User loop partitioner.
-			if (thr->ts.team_id == 0)   // team master
-			{
+				// After-stealing user functions.
+				gomp_initialize_user_functions();
+				// User loop partitioner.
 				__atomic_store_n(&gomp_use_custom_loop_partitioner, 0, __ATOMIC_RELAXED);
+				barrier_release(&gomp_group_outer_barrier);
 			}
 
-			gomp_simple_barrier_wait(&pool->threads_dock);
-
-			t_data->gws = NULL;
-			gomp_get_next_gws(t_data, group_data, incr);
+			barrier_release(group_data->inner_barrier);
 		}
-		else
-		{
-			gomp_simple_barrier_wait(&pool->threads_dock);
-			gomp_simple_barrier_wait(&pool->threads_dock);
 
-			t_data->gws = NULL;
-			gws = gomp_get_next_gws(t_data, group_data, incr);
-			if (gws == NULL)
-			{
-				PRINT_DEBUG("OUT");
-				return false;
-			}
+		t_data->gws = NULL;
+		gws = gomp_get_next_gws(t_data, group_data, incr);
+		if (gws == NULL)
+		{
+			PRINT_DEBUG("OUT");
+			return false;
 		}
 
 		/*
@@ -398,29 +367,22 @@ gomp_iter_l_ull_hierarchical_next(INT_T grain_size_init, INT_T start, INT_T end,
 				PRINT_DEBUG("OUT");
 				return false;
 			}
-			gomp_initialize_group_work(group_data->group_size, t_data->tgpos, gws->START, gws->END, &chunk_start, &chunk_end);
+			gomp_initialize_work(group_data->group_size, t_data->tgpos, gws->START, gws->END, &chunk_start, &chunk_end);
 
-			gomp_simple_barrier_wait(&pool->threads_dock);
-
-			if (t_data->tgpos == 0)     // group master
+			if (barrier_wait(group_data->inner_barrier))
+			{
 				gws->START = gws->END;
-
-			gomp_simple_barrier_wait(&pool->threads_dock);
+				barrier_release(group_data->inner_barrier);
+			}
 
 			*pstart = chunk_start;
 			*pend = chunk_end;
-			gomp_simple_barrier_wait(&pool->threads_dock);
 			PRINT_DEBUG("OUT");
 			return true;
 		}
 	}
 
-	// If group_size == 1, then threshold should be zero,
-	// else a race condition is formed, if all threads try to steal at the same time
-	// while work still exists (threshold > 0) and therefor no work is being completed.
-	INT_T steal_thres_coef = 2;
-	INT_T steal_thres;
-	steal_thres = steal_thres_coef * grain_size * (group_data->group_size - 1);
+
 	while (1)
 	{
 		chunk_start = __atomic_fetch_add(&gws->START, grain_size, __ATOMIC_RELAXED);
@@ -428,30 +390,20 @@ gomp_iter_l_ull_hierarchical_next(INT_T grain_size_init, INT_T start, INT_T end,
 
 		if (incr > 0)
 		{
-			if (chunk_end + steal_thres > gws->END)
+			if (chunk_end > gws->END)
 			{
-				// if (gws == group_data->gws_next)   // Check that no one has stolen yet.
-					// gomp_steal_gws(t_data, group_data, incr);
-				if (chunk_end > gws->END)
-				{
-					if (chunk_start >= gws->END)
-						goto NEXT_GWS;
-					chunk_end = gws->END;
-				}
+				if (chunk_start >= gws->END)
+					goto NEXT_GWS;
+				chunk_end = gws->END;
 			}
 		}
 		else
 		{
-			if (chunk_end + steal_thres < gws->END)
+			if (chunk_end < gws->END)
 			{
-				// if (gws == group_data->gws_next)   // Check that no one has stolen yet.
-					// gomp_steal_gws(t_data, group_data, incr);
-				if (chunk_end < gws->END)
-				{
-					if (chunk_start <= gws->END)
-						goto NEXT_GWS;
-					chunk_end = gws->END;
-				}
+				if (chunk_start <= gws->END)
+					goto NEXT_GWS;
+				chunk_end = gws->END;
 			}
 		}
 
@@ -471,6 +423,14 @@ gomp_iter_l_ull_hierarchical_next(INT_T grain_size_init, INT_T start, INT_T end,
 			{
 				PRINT_DEBUG("OUT");
 				return false;
+			}
+			if (__atomic_load_n(&gomp_use_after_stealing_group_fun, __ATOMIC_RELAXED))
+			{
+				if (barrier_wait(group_data->inner_barrier))
+				{
+					gomp_after_stealing_group_fun(gws->owner_group, gws->START, gws->END);
+					barrier_release(group_data->inner_barrier);
+				}
 			}
 			if (__atomic_load_n(&gomp_use_after_stealing_thread_fun, __ATOMIC_RELAXED))
 				gomp_after_stealing_thread_fun(gws->owner_group, gws->START, gws->END);

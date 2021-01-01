@@ -16,6 +16,29 @@
 
 
 //==========================================================================================================================================
+//= Barrier
+//==========================================================================================================================================
+
+
+struct gomp_barrier_data {
+	int num_threads;
+	int flag;
+	int counter __attribute__ ((aligned (CACHE_LINE_SIZE)));
+	char padding[0] __attribute__ ((aligned (CACHE_LINE_SIZE)));
+} __attribute__ ((aligned (CACHE_LINE_SIZE)));
+
+
+static inline
+void
+gomp_barrier_data_init(struct gomp_barrier_data * barrier, int num_threads)
+{
+	__atomic_store_n(&barrier->num_threads, num_threads, __ATOMIC_RELAXED);
+	__atomic_store_n(&barrier->flag, 0, __ATOMIC_RELAXED);
+	__atomic_store_n(&barrier->counter, 0, __ATOMIC_RELAXED);
+}
+
+
+//==========================================================================================================================================
 //= Stealing Passes Data
 //==========================================================================================================================================
 
@@ -105,6 +128,8 @@ struct gomp_thread_group_data {
 	struct gomp_group_work_share * gws_next;
 	int gws_next_lock;
 
+	struct gomp_barrier_data * inner_barrier;
+
 	char padding[0] __attribute__ ((aligned (CACHE_LINE_SIZE)));
 } __attribute__ ((aligned (CACHE_LINE_SIZE)));
 
@@ -126,6 +151,8 @@ gomp_thread_group_data_init(struct gomp_thread_group_data * tg_data, int tgnum, 
 	tg_data->gws_buffer      = gomp_malloc(tg_data->gws_buffer_size * sizeof(*tg_data->gws_buffer));
 	__atomic_store_n(&tg_data->gws_next, NULL, __ATOMIC_RELAXED);
 	__atomic_store_n(&tg_data->gws_next_lock, 0, __ATOMIC_SEQ_CST);
+	tg_data->inner_barrier   = gomp_malloc(sizeof(*tg_data->inner_barrier));
+	gomp_barrier_data_init(tg_data->inner_barrier, group_size);
 	for (i=0;i<tg_data->gws_buffer_size;i++)
 		gomp_group_work_share_init(&tg_data->gws_buffer[i], max_group_size);
 }
@@ -211,7 +238,7 @@ static inline struct gomp_thread_data * gomp_get_thread_data() { return gomp_thr
 
 static inline int gomp_get_max_thread_group_size() { return gomp_max_thread_group_size; }
 static inline int gomp_get_thread_group_size()     { return gomp_thread()->t_data->group_data->group_size; }
-static inline int gomp_get_num_thread_groups()     { return gomp_thread()->t_data->group_data->num_groups; }
+static inline int gomp_get_num_thread_groups()     { return gomp_num_thread_groups; }
 
 
 #endif /* TPOOL_STRUCTS_H */

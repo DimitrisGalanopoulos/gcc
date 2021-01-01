@@ -53,6 +53,7 @@ gomp_get_thread_pool (struct gomp_thread *thr, unsigned nthreads)
       int num_groups = (nthreads + gomp_max_thread_group_size - 1) / gomp_max_thread_group_size;
       struct tpool_thread_group_data ** groups = gomp_malloc(num_groups * sizeof(*pool->groups));
       __atomic_store_n(&pool->groups, groups, __ATOMIC_RELAXED);
+      gomp_barrier_data_init(&gomp_group_outer_barrier, num_groups);
     }
   PRINT_DEBUG("OUT");
   return pool;

@@ -463,6 +463,8 @@ extern int gomp_cpu_node_size;
 extern int gomp_max_thread_group_size;
 extern int gomp_num_thread_groups;
 
+extern struct gomp_barrier_data gomp_group_outer_barrier;
+
 extern int gomp_hierarchical_stealing;
 extern int gomp_hierarchical_static;
 extern int gomp_hierarchical_stealing_cpu_node_locality_pass;

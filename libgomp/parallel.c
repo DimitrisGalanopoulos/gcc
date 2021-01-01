@@ -432,7 +432,8 @@ omp_set_after_stealing_fun(void group_fun(int owner_group, long start, long end)
 {
 	if (gomp_thread()->ts.team_id == 0)   // team master
 	{
-		// We buffer these first and actually set them inside the loop, after the barrier.
+		// We buffer these first and actually set them inside the loop, after the barrier,
+		// when we are certain that no thread is inside a previous loop.
 
 		// Function executed by each group master.
 		if (group_fun != NULL)
