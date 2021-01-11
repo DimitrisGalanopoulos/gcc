@@ -96,7 +96,7 @@ struct gomp_group_work_share {
 
 static inline
 void
-gomp_group_work_share_init(struct gomp_group_work_share * gws, int max_group_size)
+gomp_group_work_share_init(struct gomp_group_work_share * gws)
 {
 	gws->end = 0;
 	gws->start = 0;
@@ -154,7 +154,7 @@ gomp_thread_group_data_init(struct gomp_thread_group_data * tg_data, int tgnum, 
 	tg_data->inner_barrier   = gomp_malloc(sizeof(*tg_data->inner_barrier));
 	gomp_barrier_data_init(tg_data->inner_barrier, group_size);
 	for (i=0;i<tg_data->gws_buffer_size;i++)
-		gomp_group_work_share_init(&tg_data->gws_buffer[i], max_group_size);
+		gomp_group_work_share_init(&tg_data->gws_buffer[i]);
 }
 
 
@@ -173,6 +173,7 @@ struct gomp_thread_data {
 	int num_threads;
 	struct gomp_thread_group_data * group_data;
 	struct gomp_group_work_share * gws;
+	int static_trip;           // 1 if 'gomp_hierarchical_static' and loop has finished.
 
 	char padding[0] __attribute__ ((aligned (CACHE_LINE_SIZE)));
 } __attribute__ ((aligned (CACHE_LINE_SIZE)));
@@ -191,6 +192,7 @@ gomp_thread_data_init(struct gomp_thread_data * t_data, struct gomp_thread_group
 	t_data->max_group_size = max_group_size;
 	t_data->num_threads    = max_threads;
 	t_data->gws            = NULL;
+	t_data->static_trip    = 0;
 	if (t_data->tgpos == 0)    // group master
 	{
 		t_data->group_data = gomp_malloc(sizeof(*t_data->group_data));

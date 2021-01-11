@@ -256,7 +256,7 @@ gomp_get_next_gws(struct gomp_thread_data * t_data, struct gomp_thread_group_dat
 
 static inline
 void
-gomp_initialize_work(int num_workers, int worker_pos, INT_T start, INT_T end, INT_T * local_start, INT_T * local_end)
+gomp_calculate_work_partition(int num_workers, int worker_pos, INT_T start, INT_T end, INT_T * local_start, INT_T * local_end)
 {
 	INT_T len         = end - start;
 	INT_T per_t_len   = len / num_workers;
@@ -318,6 +318,12 @@ gomp_iter_l_ull_hierarchical_next(INT_T grain_size_init, INT_T start, INT_T end,
 
 	if (__builtin_expect(gws == NULL, 0))    // First time in loop.
 	{
+		if (t_data->static_trip)         // If returned from hierarchical static then exit loop.
+		{
+			t_data->static_trip = 0;
+			PRINT_DEBUG("OUT");
+			return false;
+		}
 		if (barrier_wait(group_data->inner_barrier))
 		{
 			struct gomp_group_work_share data_holder;
@@ -330,7 +336,7 @@ gomp_iter_l_ull_hierarchical_next(INT_T grain_size_init, INT_T start, INT_T end,
 				data_holder.END = tmp_end;
 			}
 			else
-				gomp_initialize_work(group_data->num_groups, t_data->tgnum, start, end, &data_holder.START, &data_holder.END);
+				gomp_calculate_work_partition(group_data->num_groups, t_data->tgnum, start, end, &data_holder.START, &data_holder.END);
 			data_holder.owner_group = t_data->tgnum;
 			gws = gomp_set_next_gws(group_data, &data_holder);
 
@@ -340,6 +346,8 @@ gomp_iter_l_ull_hierarchical_next(INT_T grain_size_init, INT_T start, INT_T end,
 				gomp_initialize_user_functions();
 				// User loop partitioner.
 				__atomic_store_n(&gomp_use_custom_loop_partitioner, 0, __ATOMIC_RELAXED);
+				__atomic_store_n(&gomp_hierarchical_static, gomp_hierarchical_static_buf, __ATOMIC_RELAXED);
+				__atomic_store_n(&gomp_hierarchical_static_buf, 0, __ATOMIC_RELAXED);
 				barrier_release(&gomp_group_outer_barrier);
 			}
 
@@ -362,16 +370,13 @@ gomp_iter_l_ull_hierarchical_next(INT_T grain_size_init, INT_T start, INT_T end,
 		 */
 		if (__builtin_expect(__atomic_load_n(&gomp_hierarchical_static, __ATOMIC_RELAXED) == 1, 0))
 		{
-			if (gws->START == gws->END)
-			{
-				PRINT_DEBUG("OUT");
-				return false;
-			}
-			gomp_initialize_work(group_data->group_size, t_data->tgpos, gws->START, gws->END, &chunk_start, &chunk_end);
+			gomp_calculate_work_partition(group_data->group_size, t_data->tgpos, gws->START, gws->END, &chunk_start, &chunk_end);
+			t_data->gws = NULL;         // To re-enter loop initialization.
+			t_data->static_trip = 1;    // To immediately return the next time.
 
 			if (barrier_wait(group_data->inner_barrier))
 			{
-				gws->START = gws->END;
+				gomp_group_work_share_init(gws);              // Free and re-initialize work share.
 				barrier_release(group_data->inner_barrier);
 			}
 

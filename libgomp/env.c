@@ -109,17 +109,19 @@ struct gomp_barrier_data gomp_group_outer_barrier;
  */
 
 int gomp_hierarchical_stealing = 1;
-int gomp_hierarchical_static = 0;
 int gomp_hierarchical_stealing_cpu_node_locality_pass;
 int gomp_hierarchical_stealing_scores;
 
 /*
- * Volatile settings (restored automatically by the library).
+ * Volatile settings (restored automatically by the library before entering the next loop).
  */
 
 // We aren't allowed to assign NULL to a function pointer, so we need a flag.
 int gomp_use_custom_loop_partitioner = 0;
 void (* gomp_loop_partitioner) (long start, long end, long * part_start, long * part_end);
+
+int gomp_hierarchical_static = 0;
+int gomp_hierarchical_static_buf = 0;
 
 // After stealing user functions.
 
@@ -1418,9 +1420,9 @@ initialize_env (void)
 	parse_boolean("OMP_HIERARCHICAL_STEALING", &flag);
 	gomp_hierarchical_stealing = flag ? 1 : 0;
 
-	flag = false;
-	parse_boolean("OMP_HIERARCHICAL_STATIC", &flag);
-	gomp_hierarchical_static = flag ? 1 : 0;
+	// flag = false;
+	// parse_boolean("OMP_HIERARCHICAL_STATIC", &flag);
+	// gomp_hierarchical_static = flag ? 1 : 0;
 
 	flag = false;
 	parse_boolean("OMP_HIERARCHICAL_STEALING_CPU_NODE_LOCALITY_PASS", &flag);

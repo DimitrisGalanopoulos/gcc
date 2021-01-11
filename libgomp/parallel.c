@@ -397,21 +397,24 @@ omp_set_hierarchical_stealing(int v)
 int
 omp_get_hierarchical_static()
 {
-	return gomp_hierarchical_static;
+	return gomp_hierarchical_static_buf;
 }
 
 
 void
 omp_set_hierarchical_static(int v)
 {
-	gomp_hierarchical_static = v;
+	if (gomp_thread()->ts.team_id == 0)   // team master (single thread)
+		gomp_hierarchical_static_buf = (v != 0) ? 1 : 0;
+	// We are expecting a barrier before entering the hierarchical loop.
 }
 
 
 int
 omp_get_gws_owner_thread_group_num()
 {
-	return gomp_thread()->t_data->gws->owner_group;
+	struct gomp_group_work_share * gws = gomp_thread()->t_data->gws;
+	return (gws != NULL) ? gws->owner_group : -1;
 }
 
 

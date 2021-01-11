@@ -467,6 +467,7 @@ extern struct gomp_barrier_data gomp_group_outer_barrier;
 
 extern int gomp_hierarchical_stealing;
 extern int gomp_hierarchical_static;
+extern int gomp_hierarchical_static_buf;
 extern int gomp_hierarchical_stealing_cpu_node_locality_pass;
 extern int gomp_hierarchical_stealing_scores;
 
