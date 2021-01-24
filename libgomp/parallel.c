@@ -431,25 +431,39 @@ omp_set_loop_partitioner(void fun(long start, long end, long * part_start, long 
 
 
 void
-omp_set_after_stealing_fun(void group_fun(int owner_group, long start, long end), void thread_fun(int owner_group, long start, long end))
+omp_set_after_stealing_fun(void group_fun(int owner_group, long start, long end, void * data),  void * user_data_group,
+                           void thread_fun(int owner_group, long start, long end, void * data), void * user_data_thread)
 {
-	if (gomp_thread()->ts.team_id == 0)   // team master
+	struct gomp_thread            * thr        = gomp_thread();
+	struct gomp_thread_data       * t_data     = thr->t_data;
+	struct gomp_thread_group_data * group_data = t_data->group_data;
+
+	// We buffer these first and actually set them inside the loop, after the barrier,
+	// when we are certain that no thread is inside a previous loop.
+
+	// Function executed by each group master.
+	if (group_fun != NULL)
 	{
-		// We buffer these first and actually set them inside the loop, after the barrier,
-		// when we are certain that no thread is inside a previous loop.
 
-		// Function executed by each group master.
-		if (group_fun != NULL)
+		if (t_data->tgpos == 0)    // group master
 		{
-			gomp_use_after_stealing_group_fun_next_loop = 1;
-			gomp_after_stealing_group_fun_next_loop = group_fun;
+			group_data->after_stealing_group_fun_data_buf = user_data_group;
 		}
-
-		// Function executed by each thread.
-		if (thread_fun != NULL)
+		if (gomp_thread()->ts.team_id == 0)   // team master
 		{
-			gomp_use_after_stealing_thread_fun_next_loop = 1;
-			gomp_after_stealing_thread_fun_next_loop = thread_fun;
+			gomp_use_after_stealing_group_fun_buf = 1;
+			gomp_after_stealing_group_fun_buf = group_fun;
+		}
+	}
+
+	// Function executed by each thread.
+	if (thread_fun != NULL)
+	{
+		t_data->after_stealing_thread_fun_data = user_data_thread;
+		if (gomp_thread()->ts.team_id == 0)   // team master
+		{
+			gomp_use_after_stealing_thread_fun_buf = 1;
+			gomp_after_stealing_thread_fun_buf = thread_fun;
 		}
 	}
 }

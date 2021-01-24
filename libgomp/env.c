@@ -125,15 +125,15 @@ int gomp_hierarchical_static_buf = 0;
 
 // After stealing user functions.
 
-int gomp_use_after_stealing_group_fun_next_loop = 0;
-int gomp_use_after_stealing_group_fun           = 0;
-void (* gomp_after_stealing_group_fun_next_loop) (int owner_group, long start, long end);
-void (* gomp_after_stealing_group_fun          ) (int owner_group, long start, long end);
+int gomp_use_after_stealing_group_fun_buf = 0;
+int gomp_use_after_stealing_group_fun     = 0;
+void (* gomp_after_stealing_group_fun_buf) (int owner_group, long start, long end, void * data);
+void (* gomp_after_stealing_group_fun    ) (int owner_group, long start, long end, void * data);
 
-int gomp_use_after_stealing_thread_fun_next_loop = 0;
-int gomp_use_after_stealing_thread_fun           = 0;
-void (* gomp_after_stealing_thread_fun_next_loop) (int owner_group, long start, long end);
-void (* gomp_after_stealing_thread_fun          ) (int owner_group, long start, long end);
+int gomp_use_after_stealing_thread_fun_buf = 0;
+int gomp_use_after_stealing_thread_fun     = 0;
+void (* gomp_after_stealing_thread_fun_buf) (int owner_group, long start, long end, void * data);
+void (* gomp_after_stealing_thread_fun   ) (int owner_group, long start, long end, void * data);
 
 
 #ifndef LIBGOMP_OFFLOADED_ONLY

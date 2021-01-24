@@ -474,15 +474,15 @@ extern int gomp_hierarchical_stealing_scores;
 extern int gomp_use_custom_loop_partitioner;
 extern void (* gomp_loop_partitioner) (long start, long end, long * part_start, long * part_end);
 
-extern int gomp_use_after_stealing_group_fun_next_loop;
-extern void (* gomp_after_stealing_group_fun_next_loop) (int owner_group, long start, long end);
+extern int gomp_use_after_stealing_group_fun_buf;
 extern int gomp_use_after_stealing_group_fun;
-extern void (* gomp_after_stealing_group_fun) (int owner_group, long start, long end);
+extern void (* gomp_after_stealing_group_fun_buf) (int owner_group, long start, long end, void * data);
+extern void (* gomp_after_stealing_group_fun) (int owner_group, long start, long end, void * data);
 
-extern int gomp_use_after_stealing_thread_fun_next_loop;
-extern void (* gomp_after_stealing_thread_fun_next_loop) (int owner_group, long start, long end);
+extern int gomp_use_after_stealing_thread_fun_buf;
 extern int gomp_use_after_stealing_thread_fun;
-extern void (* gomp_after_stealing_thread_fun) (int owner_group, long start, long end);
+extern void (* gomp_after_stealing_thread_fun_buf) (int owner_group, long start, long end, void * data);
+extern void (* gomp_after_stealing_thread_fun) (int owner_group, long start, long end, void * data);
 
 
 enum gomp_task_kind

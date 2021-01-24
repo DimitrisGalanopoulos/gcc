@@ -128,7 +128,8 @@ extern int  omp_get_hierarchical_static() __GOMP_NOTHROW;
 extern void omp_set_hierarchical_static(int v) __GOMP_NOTHROW;
 extern int  omp_get_gws_owner_thread_group_num()  __GOMP_NOTHROW;
 extern void omp_set_loop_partitioner(void fun(long start, long end, long * part_start, long * part_end)) __GOMP_NOTHROW;
-extern void omp_set_after_stealing_fun(void group_fun(int owner_group, long start, long end), void thread_fun(int owner_group, long start, long end)) __GOMP_NOTHROW;
+extern void omp_set_after_stealing_fun(void group_fun(int owner_group, long start, long end, void * data), void * group_data,
+                                       void thread_fun(int owner_group, long start, long end, void * data), void * thread_data) __GOMP_NOTHROW;
 
 
 extern void omp_init_lock (omp_lock_t *) __GOMP_NOTHROW;

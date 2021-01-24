@@ -279,20 +279,20 @@ static inline
 void
 gomp_initialize_user_functions()
 {
-	if (__atomic_load_n(&gomp_use_after_stealing_group_fun_next_loop, __ATOMIC_RELAXED))
+	if (__atomic_load_n(&gomp_use_after_stealing_group_fun_buf, __ATOMIC_RELAXED))
 	{
 		__atomic_store_n(&gomp_use_after_stealing_group_fun, 1, __ATOMIC_RELAXED);
-		__atomic_store_n(&gomp_use_after_stealing_group_fun_next_loop, 0, __ATOMIC_RELAXED);
-		__atomic_store_n(&gomp_after_stealing_group_fun, gomp_after_stealing_group_fun_next_loop, __ATOMIC_RELAXED);
+		__atomic_store_n(&gomp_use_after_stealing_group_fun_buf, 0, __ATOMIC_RELAXED);
+		__atomic_store_n(&gomp_after_stealing_group_fun, gomp_after_stealing_group_fun_buf, __ATOMIC_RELAXED);
 	}
 	else
 		__atomic_store_n(&gomp_use_after_stealing_group_fun, 0, __ATOMIC_RELAXED);
 
-	if (__atomic_load_n(&gomp_use_after_stealing_thread_fun_next_loop, __ATOMIC_RELAXED))
+	if (__atomic_load_n(&gomp_use_after_stealing_thread_fun_buf, __ATOMIC_RELAXED))
 	{
 		__atomic_store_n(&gomp_use_after_stealing_thread_fun, 1, __ATOMIC_RELAXED);
-		__atomic_store_n(&gomp_use_after_stealing_thread_fun_next_loop, 0, __ATOMIC_RELAXED);
-		__atomic_store_n(&gomp_after_stealing_thread_fun, gomp_after_stealing_thread_fun_next_loop, __ATOMIC_RELAXED);
+		__atomic_store_n(&gomp_use_after_stealing_thread_fun_buf, 0, __ATOMIC_RELAXED);
+		__atomic_store_n(&gomp_after_stealing_thread_fun, gomp_after_stealing_thread_fun_buf, __ATOMIC_RELAXED);
 	}
 	else
 		__atomic_store_n(&gomp_use_after_stealing_thread_fun, 0, __ATOMIC_RELAXED);
@@ -350,6 +350,8 @@ gomp_iter_l_ull_hierarchical_next(INT_T grain_size_init, INT_T start, INT_T end,
 				__atomic_store_n(&gomp_hierarchical_static_buf, 0, __ATOMIC_RELAXED);
 				barrier_release(&gomp_group_outer_barrier);
 			}
+
+			__atomic_store_n(&group_data->after_stealing_group_fun_data, group_data->after_stealing_group_fun_data_buf, __ATOMIC_RELAXED);
 
 			barrier_release(group_data->inner_barrier);
 		}
@@ -433,12 +435,12 @@ gomp_iter_l_ull_hierarchical_next(INT_T grain_size_init, INT_T start, INT_T end,
 			{
 				if (barrier_wait(group_data->inner_barrier))
 				{
-					gomp_after_stealing_group_fun(gws->owner_group, gws->START, gws->END);
+					gomp_after_stealing_group_fun(gws->owner_group, gws->START, gws->END, group_data->after_stealing_group_fun_data);
 					barrier_release(group_data->inner_barrier);
 				}
 			}
 			if (__atomic_load_n(&gomp_use_after_stealing_thread_fun, __ATOMIC_RELAXED))
-				gomp_after_stealing_thread_fun(gws->owner_group, gws->START, gws->END);
+				gomp_after_stealing_thread_fun(gws->owner_group, gws->START, gws->END, t_data->after_stealing_thread_fun_data);
 	}
 }
 

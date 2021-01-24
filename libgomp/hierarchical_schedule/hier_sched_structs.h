@@ -121,6 +121,7 @@ struct gomp_thread_group_data {
 	int group_size;        // actual size of this group (usually == max_group_size)
 	int num_groups;
 	int master_tnum;
+	struct gomp_barrier_data * inner_barrier;
 
 	struct gomp_group_work_share * gws_buffer __attribute__ ((aligned (CACHE_LINE_SIZE)));
 	int gws_buffer_size;   // > 1 to work correctly.
@@ -128,7 +129,8 @@ struct gomp_thread_group_data {
 	struct gomp_group_work_share * gws_next;
 	int gws_next_lock;
 
-	struct gomp_barrier_data * inner_barrier;
+	void * after_stealing_group_fun_data_buf;
+	void * after_stealing_group_fun_data;
 
 	char padding[0] __attribute__ ((aligned (CACHE_LINE_SIZE)));
 } __attribute__ ((aligned (CACHE_LINE_SIZE)));
@@ -145,16 +147,19 @@ gomp_thread_group_data_init(struct gomp_thread_group_data * tg_data, int tgnum, 
 	tg_data->group_size     = group_size;
 	tg_data->num_groups     = num_groups;
 	tg_data->master_tnum    = master_tnum;
+	tg_data->inner_barrier  = gomp_malloc(sizeof(*tg_data->inner_barrier));
+	gomp_barrier_data_init(tg_data->inner_barrier, group_size);
 
 	tg_data->gws_buffer_size = 8*group_size + 2;    // > 1 to work correctly.
 	tg_data->gws_next_index  = -1;
 	tg_data->gws_buffer      = gomp_malloc(tg_data->gws_buffer_size * sizeof(*tg_data->gws_buffer));
 	__atomic_store_n(&tg_data->gws_next, NULL, __ATOMIC_RELAXED);
 	__atomic_store_n(&tg_data->gws_next_lock, 0, __ATOMIC_SEQ_CST);
-	tg_data->inner_barrier   = gomp_malloc(sizeof(*tg_data->inner_barrier));
-	gomp_barrier_data_init(tg_data->inner_barrier, group_size);
 	for (i=0;i<tg_data->gws_buffer_size;i++)
 		gomp_group_work_share_init(&tg_data->gws_buffer[i]);
+
+	tg_data->after_stealing_group_fun_data_buf = NULL;
+	tg_data->after_stealing_group_fun_data = NULL;
 }
 
 
@@ -174,6 +179,7 @@ struct gomp_thread_data {
 	struct gomp_thread_group_data * group_data;
 	struct gomp_group_work_share * gws;
 	int static_trip;           // 1 if 'gomp_hierarchical_static' and loop has finished.
+	void * after_stealing_thread_fun_data;
 
 	char padding[0] __attribute__ ((aligned (CACHE_LINE_SIZE)));
 } __attribute__ ((aligned (CACHE_LINE_SIZE)));
@@ -193,6 +199,7 @@ gomp_thread_data_init(struct gomp_thread_data * t_data, struct gomp_thread_group
 	t_data->num_threads    = max_threads;
 	t_data->gws            = NULL;
 	t_data->static_trip    = 0;
+	t_data->after_stealing_thread_fun_data = NULL;
 	if (t_data->tgpos == 0)    // group master
 	{
 		t_data->group_data = gomp_malloc(sizeof(*t_data->group_data));
